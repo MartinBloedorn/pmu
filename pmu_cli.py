@@ -3,9 +3,8 @@ import sys
 import random
 
 from collections import OrderedDict
-from pmu_parsers   import *
 from pmu_planner   import *
-
+from pmu_view      import *
 
 class pmuCLI:
     """
@@ -29,7 +28,7 @@ class pmuCLI:
                                                  'That\'s helpless.')
         self.register_command(self.exit, 'quit', 'Leave PMU.', '')
         self.register_command(self.list, 'list', 'List variables in workspace.',
-                                                 "Usage: list [work|drill|grid]")
+                                                 "Usage: list [work|drl|grid]")
         self.register_command(self.set_variable, 'set', 'Set variable in workspace.',
                                                  "Usage: set <varname> <value>", 2)
         self.register_command(self.del_variable, 'del', 'Remove variable from workspace.', "Usage: del <varname>", 1)
@@ -45,6 +44,8 @@ class pmuCLI:
         self.register_command(self.probe,  'probe', 'Generate grid and execute probing.',
                                                  "Usage: probe [grid]\tGenerate grid.\n"
                                                  "       probe run   \tConnect to CNC and execute probing.")
+        self.register_command(self.view,   'view', 'Visualize data.',
+                                                 "Usage: view [drl|probe|new|clear|grid]", 1)
 
         # PMU Model objects
         self.pmuConfParser  = ConfParser()
@@ -52,6 +53,7 @@ class pmuCLI:
         self.hmapParser     = HMapParser()
         self.Planner        = pmuPlanner()
         self.gcodeParser    = GCodeParser()
+        self.View           = pmuView()
 
     def run(self):
         # Parse project configuration; exits on error
@@ -147,20 +149,19 @@ class pmuCLI:
             else:
                 print('Work buffer type can not be saved.')
 
-
     def list(self, arglist):
         # List the workspace variables
         if len(arglist) == 0 or arglist[0] == 'work':
             print('\n\t:Workspace:')
-            for v in self.pmuConfParser.paramdict:
-                print('{}'.format(v) + ' ' * (20 - len(v)) + '\t=  {}'.format(self.pmuConfParser.paramdict[v]))
+            for v in self.pmuConfParser.param:
+                print('{}'.format(v) + ' ' * (20 - len(v)) + '\t=  {}'.format(self.pmuConfParser[v]))
             print('\n\t:Active files:')
             print('GCode          : {}'.format(self.Planner.activeGCodeFile))
             print('Excellon       : {}'.format(self.Planner.activeDrillFile))
             print('Heightmap      : {}'.format(self.Planner.activeHMapFile))
             print('\nWork Buffer    : {} ({})'.format(self.Planner.buffer, self.Planner.bufferDescription))
         # List the parsed drill points
-        elif arglist[0] == 'drill':
+        elif arglist[0] == 'drl':
             print('\n\t:Drills:\nDiam\tX   \tY')
             for d in self.excellonParser.buffer:
                 print('{}\t{}\t{}'.format(d[0], d[1], d[2]))
@@ -186,7 +187,11 @@ class pmuCLI:
     def probe(self, arglist):
         if len(arglist) == 0 or arglist[0] == 'grid':
             # Pull parameters directly off configuration file
-            self.Planner.Leveler.parse_dict(self.pmuConfParser.paramdict)
+            try:
+                self.Planner.Leveler.parse_dict(self.pmuConfParser.dict)
+            except:
+                print(sys.exc_info()[1])
+                return
             if (self.Planner.leveling_gen_grid(self.excellonParser.buffer)):
                 print('Successfully generated grid.')
             else:
@@ -206,6 +211,31 @@ class pmuCLI:
             print('Successfully leveled G-Code.')
         else:
             print('Failed to level G-Code.')
+
+    def view(self, arglist):
+        # Pull parameters directly off configuration file
+        try:
+            self.View.parse_dict(self.pmuConfParser.dict)
+        except:
+            print(sys.exc_info()[1])
+            return
+        if   arglist[0] == 'drl':
+            self.View.print_drills(self.excellonParser.buffer)
+        elif arglist[0] == 'drltol':
+            self.View.print_drills(self.excellonParser.buffer, True)
+        elif arglist[0] == 'probe':
+            self.View.print_probe(self.Planner.buffer)
+        elif arglist[0] == 'new':
+            self.View.new_window()
+        elif arglist[0] == 'clear':
+            self.View.clear_plot()
+        elif arglist[0] == 'grid':
+            self.View.toggle_grid()
+        else:
+            print('Unrecognized view command {}'.format(arglist[0]))
+        # Allows to concatenate more arguments
+        if len(arglist) > 1:
+            self.view(arglist[1:])
 
     def print_help(self, arglist):
         # Print root info

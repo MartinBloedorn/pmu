@@ -1,7 +1,6 @@
 from collections import OrderedDict
 from enum import Enum
 
-from pmu_buffers import *
 from pmu_workspace import *
 
 import scipy as sp
@@ -72,38 +71,18 @@ class pmuPlanner:
         return r
 
 
-class Leveling(BaseWorkspace):
+class Leveling(DefaultWorkspace):
     """
     Explanation.
     """
     def __init__(self):
-        BaseWorkspace.__init__(self)
+        DefaultWorkspace.__init__(self)
 
         self.__probingGrid  = GridBuffer()
         self.__lvlGCodeBuff = GCodeBuffer() # Leveled GCode buffer
 
         self.__verbose = True
         self.__surff   = None
-
-        # General
-        self.addparam(self.pt.precision, [int], 4)  # amount of digits to be used after comma
-
-        # Drill avoidance and grid generation
-        self.addparam(self.pt.drltol,     [float, int], 1.0) # minimum distance from probing pt to drill (mm)
-        self.addparam(self.pt.drlscope,   [float, int], 5.0) # distance of drills considered when avoiding
-        self.addparam(self.pt.drlstep,    [float, int], 0.2) # step of probing point when avoiding drill
-        self.addparam(self.pt.maxiter,    [int], 20)  # maximum iterations when avoiding a drill
-        self.addparam(self.pt.randiter,   [int], 10)  # start adding random values after k-th iteration
-        self.addparam(self.pt.probe_lims, [list, float, int], [0.0, 1.0, 0.0, 1.0])  # [xmin xmax ymin ymax]
-        self.addparam(self.pt.probe_tick, [list, int], [1, 1])  # how many pts, [xtick ytick]
-        self.addparam(self.pt.mirrorax,   [str],  '') # axis to mirror drills, parallel to 'x' or 'y'
-        self.addparam(self.pt.mirrorval,  [float, int], 0.0) # mirror //x, at y=15 -> self.pt.mirrorax='x', self.pt.mirrorval=15
-
-        # GCode leveling
-        self.addparam(self.pt.mincutdepth, [float, int], 0.0) # height to break motion concatenation
-        self.addparam(self.pt.initialcoord,[list, float, int], [0.0, 0.0, 0.0]) # machine initial coordinates
-        self.addparam(self.pt.zthreshold,  [float, int], 0.01) # threshold to add another point in leveling path
-        self.addparam(self.pt.xysampling,  [float, int], 1.0)  # zthreshold sampling rate
 
     @property
     def probingGrid(self):
@@ -153,13 +132,13 @@ class Leveling(BaseWorkspace):
             i = 1 if self[self.pt.mirrorax] is 'x' else 2
             for d in __drills:
                 d[i] += 2*(self[self.pt.mirrorval] - d[i])
-        # Computing increment in each direction
-        xi = (self[self.pt.probe_lims][1] - self[self.pt.probe_lims][0]) / self[self.pt.probe_tick][0]
-        yi = (self[self.pt.probe_lims][3] - self[self.pt.probe_lims][2]) / self[self.pt.probe_tick][1]
-        # Compute grid itself
-        for xp in range(0, self[self.pt.probe_tick][0]):
-            for yp in range(0, self[self.pt.probe_tick][1]):
-                p = sp.array([xi*xp + self[self.pt.probe_lims][0], yi*yp + self[self.pt.probe_lims][2]])
+
+        probl = self[self.pt.probe_lims]
+        probt = self[self.pt.probe_tick]
+        # Compute grid itself,
+        for xp in sp.linspace(probl[0], probl[1], probt[0]):
+            for yp in sp.linspace(probl[2], probl[3], probt[1]):
+                p = sp.array([xp, yp])
 
                 collision = False
                 drl2avoid = []

@@ -64,7 +64,6 @@ class BaseWorkspace(object):
     def __init__(self, groupname=''):
         self.__paramdict = OrderedDict()
         self.__groupname = groupname # Defaults to '', root (free) group
-        self.__pt        = DefaultParamNameTable()
 
     @property
     def param(self) -> dict:
@@ -76,8 +75,11 @@ class BaseWorkspace(object):
         return self.__groupname
 
     @property
-    def pt(self):
-        return self.__pt
+    def dict(self) -> dict:
+        d = OrderedDict()
+        for e in self.param:
+            d[e] = self[e]
+        return d
 
     def __tl(self, key) -> list:
         """ Return type list. """
@@ -112,16 +114,32 @@ class BaseWorkspace(object):
             raise ValueError
         self.__paramdict[key] = [typ, val]
 
-    def parse_dict(self, dict):
+    # def parse_param(self, param):
+    #     if not issubclass(type(param), BaseWorkspace):
+    #         raise TypeError
+    #     for e in param:
+    #         self[e] = param[e]
+
+    def parse_dict(self, dict, allow_new=False, quiet=False):
         """Parses dictionary. Converts variables to registered types, including lists."""
         for key in dict:
             if key not in self.__paramdict:
+                if allow_new:
+                    self.addparam(key, [type(dict[key])], dict[key])
                 continue
             if type(dict[key]) is str and self.type(key) is list:
-                self[key] = [self.__tl(key)[1](i) for i in \
-                     dict[key].replace('[','').replace(']','').split(',')]
+                try:
+                    self[key] = [self.__tl(key)[1](i) for i in \
+                        dict[key].replace('[','').replace(']','').split(',')]
+                except:
+                    if not quiet:
+                        raise TypeError('Incorrectly formatted entry {}'.format(key))
             else:
-                self[key] = self.type(key)(dict[key])
+                try:
+                    self[key] = self.type(key)(dict[key])
+                except:
+                    if not quiet:
+                        raise TypeError('Incorrectly formatted entry {}'.format(key))
 
     def type(self, key):
         try:
@@ -129,3 +147,34 @@ class BaseWorkspace(object):
         except:
             return type(None)
 
+
+class DefaultWorkspace(BaseWorkspace):
+    """
+    Singleton class containing all PMU parameters, pre-initialized.
+    """
+    def __init__(self):
+        BaseWorkspace.__init__(self)
+        # Parameter names
+        self.__pt = DefaultParamNameTable()
+
+        # General
+        self.addparam(self.pt.precision, [int], 4)  # amount of digits to be used after comma
+        # Drill avoidance and grid generation
+        self.addparam(self.pt.drltol, [float, int], 1.0)  # minimum distance from probing pt to drill (mm)
+        self.addparam(self.pt.drlscope, [float, int], 5.0)  # distance of drills considered when avoiding
+        self.addparam(self.pt.drlstep, [float, int], 0.2)  # step of probing point when avoiding drill
+        self.addparam(self.pt.maxiter, [int], 20)  # maximum iterations when avoiding a drill
+        self.addparam(self.pt.randiter, [int], 10)  # start adding random values after k-th iteration
+        self.addparam(self.pt.probe_lims, [list, float, int], [0.0, 1.0, 0.0, 1.0])  # [xmin xmax ymin ymax]
+        self.addparam(self.pt.probe_tick, [list, int], [1, 1])  # how many pts, [xtick ytick]
+        self.addparam(self.pt.mirrorax, [str], '')  # axis to mirror drills, parallel to 'x' or 'y'
+        self.addparam(self.pt.mirrorval, [float, int], 0.0)  # mirror axis position
+        # GCode leveling
+        self.addparam(self.pt.mincutdepth, [float, int], 0.0)  # height to break motion concatenation
+        self.addparam(self.pt.initialcoord, [list, float, int], [0.0, 0.0, 0.0])  # machine initial coordinates
+        self.addparam(self.pt.zthreshold, [float, int], 0.01)  # threshold to add another point in leveling path
+        self.addparam(self.pt.xysampling, [float, int], 1.0)  # zthreshold sampling rate
+
+    @property
+    def pt(self):
+        return self.__pt

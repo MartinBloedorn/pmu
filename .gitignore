@@ -1,3 +1,7 @@
 # Ignore annoying MacOS thingies
 *.DS_Store
 gerber/
+
+# Ignore PyCharm sheenanigans
+.idea*
+__pycache__/

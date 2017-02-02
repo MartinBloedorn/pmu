@@ -1,3 +1,4 @@
+from pmu_workspace import *
 from pmu_buffers import *
 
 from collections import OrderedDict
@@ -59,7 +60,7 @@ class GenericParser(object):
         return True
 
 
-class ConfParser(GenericParser):
+class ConfParser(GenericParser, DefaultWorkspace):
     """
     Parses/writes PMU configuration files.
     After parsing, holds the parameter dictionary.
@@ -67,11 +68,7 @@ class ConfParser(GenericParser):
 
     def __init__(self):
         GenericParser.__init__(self)
-        self.__paramdict = OrderedDict()
-
-    @property
-    def paramdict(self):
-        return self.__paramdict
+        DefaultWorkspace.__init__(self)
 
     def parse_file(self, fpath=None) -> bool:
         if not super().parse_file(fpath):
@@ -79,21 +76,24 @@ class ConfParser(GenericParser):
 
         cfd = open(self.filepath, 'r')
         print('Parsing configuration file {}'.format(self.filepath))
+
+        __indict = OrderedDict()
         for line in cfd:
             # Is a comment
             if re.match('[\s\t]*#.*', line) is not None:
                 continue
             # Is an entry; expand any pre-existing variables
             try:
-                line = self.__expand_variables(line)
+                line = self.__expand_variables(line, __indict)
             except:
                 continue
             m = re.match('[\s\t]*(?P<varname>\S*)[\s\t]*=[\s\t]*(?P<varcontent>\S*)[\s\t]*(#.*)?', line)
             m = re.match('[\s\t]*(?P<varname>\S*)[\s\t]*=[\s\t]*(?P<varcontent>[^#^\n]*)', line)
             if m is not None and m.group('varname') and m.group('varcontent'):
-                self.__paramdict[m.group('varname')] = m.group('varcontent')
+                __indict[m.group('varname')] = m.group('varcontent')
                 continue
         # print(self.paramdict)
+        self.parse_dict(__indict, allow_new=True)
         cfd.close()
 
     def set(self, name, value):
@@ -101,38 +101,39 @@ class ConfParser(GenericParser):
         Changes or adds an entry in/to the paramdict.
         """
         if type(name) is str:
-            if name not in self.__paramdict:
+            if name not in self.param:
                 print('Adding new variable {} to workspace.'.format(name))
             try:
-                self.__paramdict[name] = self.__expand_variables(value)
+                self[name] = self.__expand_variables(value)
             except:
                 pass
 
     def get(self, name) -> Union[str, None]:
-        if name not in self.__paramdict:
+        if name not in self.param:
             print('No variable {} in workspace!'.format(name))
             return None
-        return self.__paramdict[name]
+        return self[name]
 
     def delete(self, name):
         """
         Removes entry from paramdict:
         """
         if type(name) is str:
-            if name in self.__paramdict:
-                del self.__paramdict[name]
+            if name in self.param:
+                del self[name]
             else:
                 print('No variable {} to delete.'.format(name))
 
-    def __expand_variables(self, line) -> str:
+    def __expand_variables(self, line, dict=None) -> str:
+        dict = self.param if dict is None else dict
         m = []
         while m is not None:
             m = re.match('(.*)\$\((?P<varname>\w*)\)(.*)', line)
             if m is not None:
-                if m.group('varname') not in self.__paramdict:
+                if m.group('varname') not in dict:
                     print('Undefined variable {}'.format(m.group('varname')))
                     raise Exception
-                line = m.group(1) + self.__paramdict[m.group('varname')] + m.group(3)
+                line = m.group(1) + dict[m.group('varname')] + m.group(3)
         return line
 
 
