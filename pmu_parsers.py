@@ -105,7 +105,7 @@ class ConfParser(GenericParser, DefaultWorkspace):
                 print('Adding new variable {} to workspace.'.format(name))
             try:
                 # self[name] = self.__expand_variables(value)
-                self.parse_dict({name: self.__expand_variables(value)})
+                self.parse_dict({name: self.__expand_variables(value)}, allow_new=True)
             except:
                 pass
 
@@ -126,7 +126,7 @@ class ConfParser(GenericParser, DefaultWorkspace):
                 print('No variable {} to delete.'.format(name))
 
     def __expand_variables(self, line, dict=None) -> str:
-        dict = self.param if dict is None else dict
+        dict = self.dict if dict is None else dict
         m = []
         while m is not None:
             m = re.match('(.*)\$\((?P<varname>\w*)\)(.*)', line)

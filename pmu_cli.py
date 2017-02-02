@@ -45,7 +45,8 @@ class pmuCLI:
                                                  "Usage: probe [grid]\tGenerate grid.\n"
                                                  "       probe run   \tConnect to CNC and execute probing.")
         self.register_command(self.view,   'view', 'Visualize data.',
-                                                 "Usage: view [drl|probe|new|clear|grid]", 1)
+                                                 "Usage: view [drl|drltol|probe|new|clear|grid]\n"
+                                                 "Multiple parameters can be combined at once.", 1)
 
         # PMU Model objects
         self.pmuConfParser  = ConfParser()
