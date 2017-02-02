@@ -104,7 +104,8 @@ class ConfParser(GenericParser, DefaultWorkspace):
             if name not in self.param:
                 print('Adding new variable {} to workspace.'.format(name))
             try:
-                self[name] = self.__expand_variables(value)
+                # self[name] = self.__expand_variables(value)
+                self.parse_dict({name: self.__expand_variables(value)})
             except:
                 pass
 
